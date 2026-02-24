@@ -112,6 +112,7 @@ export default function Home() {
         {/* Banner 1: Stranger Things */}
         <div onClick={() => setView('store')} className="relative h-[85vh] w-full cursor-pointer group overflow-hidden border-b border-white/10">
           <div className="absolute inset-0 bg-red-900/20 group-hover:bg-red-900/10 transition-colors z-10" />
+          <img src="/Strangerthings1.jpeg" alt="Stranger Things" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-[2s]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40 z-20" />
           <div className="absolute bottom-16 left-8 md:left-16 z-30">
             <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter drop-shadow-2xl">Stranger <br/> Things</h2>
@@ -119,8 +120,11 @@ export default function Home() {
           </div>
         </div>
 
+      
+
         {/* Banner 2: Breaking Bad */}
         <div onClick={() => triggerToast("Heisenberg is busy. Coming Soon.")} className="relative h-[85vh] w-full cursor-pointer group overflow-hidden border-b border-white/10">
+          <img src="/BrBa3.jpeg" alt="Breaking Bad" className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-[2s]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
           <div className="absolute bottom-16 left-8 md:left-16">
             <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter opacity-80">Breaking <br/> Bad</h2>
@@ -130,6 +134,7 @@ export default function Home() {
 
         {/* Banner 3: The Office */}
         <div onClick={() => triggerToast("Threat Level Midnight. Coming Soon.")} className="relative h-[85vh] w-full cursor-pointer group overflow-hidden">
+          <img src="/Theoffice2.jpeg" alt="The Office" className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:scale-105 transition-transform duration-[2s]" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40" />
           <div className="absolute bottom-16 left-8 md:left-16">
             <h2 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter opacity-70">The <br/> Office</h2>
