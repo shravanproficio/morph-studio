@@ -1,5 +1,5 @@
 "use client";
-
+import Script from 'next/script';
 import React, { useState } from 'react';
 import { 
   ShoppingBag, Maximize, Zap, ArrowUpRight, X, Truck, 
@@ -53,8 +53,72 @@ export default function Home() {
   const [deliveryEst, setDeliveryEst] = useState('');
   const [formData, setFormData] = useState({ name: '', number: '', mail: '', address: '', age: '' });
 
-  // --- LOGIC ---
+  // Calculation
+  const totalPrice = cartItems.reduce((acc, item) => acc + parseInt(item.price.replace('INR ', '')), 0);
 
+  // --- RAZORPAY INTEGRATION START ---
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handlePayment = async () => {
+    if (cartItems.length === 0) return;
+    setIsProcessing(true);
+
+    try {
+      // 1. Create Order
+      const response = await fetch('/api/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: totalPrice }),
+      });
+
+      const order = await response.json();
+
+      if (!response.ok) {
+        throw new Error("Failed to create order");
+      }
+
+      // 2. Initialize Options
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Upside Down 3D",
+        description: "3D Printed Collectibles",
+        order_id: order.id,
+        handler: function (response: any) {
+          // 3. Payment Success
+          alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}`);
+          // Optional: Clear cart here if you want
+          // setCartItems([]); 
+        },
+        prefill: {
+          name: "User Name", 
+          email: "user@example.com",
+          contact: "9999999999",
+        },
+        theme: {
+          color: "#6f01ff", 
+        },
+        modal: {
+          ondismiss: function() {
+            setIsProcessing(false); 
+          }
+        }
+      };
+
+      // 4. Open Popup
+      const rzp1 = new (window as any).Razorpay(options);
+      rzp1.open();
+
+    } catch (error) {
+      console.error("Payment failed:", error);
+      alert("Something went wrong with the payment setup.");
+      setIsProcessing(false);
+    }
+  };
+  // --- RAZORPAY INTEGRATION END ---
+
+  // --- LOGIC ---
   const triggerToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
@@ -102,8 +166,6 @@ export default function Home() {
     setCartItems(cartItems.filter((_, i) => i !== index));
   };
 
-  const totalPrice = cartItems.reduce((acc, item) => acc + parseInt(item.price.replace('INR ', '')), 0);
-
   // --- VIEW: LANDING BANNERS ---
   if (view === 'landing') {
     return (
@@ -119,8 +181,6 @@ export default function Home() {
             <p className="text-[#6f01ff] font-bold tracking-[0.4em] uppercase mt-4 text-sm md:text-base animate-pulse">Collection Live — Enter Void</p>
           </div>
         </div>
-
-      
 
         {/* Banner 2: Breaking Bad */}
         <div onClick={() => triggerToast("Heisenberg is busy. Coming Soon.")} className="relative h-[85vh] w-full cursor-pointer group overflow-hidden border-b border-white/10">
@@ -151,7 +211,6 @@ export default function Home() {
       </div>
     );
   }
-
   // --- VIEW: STORE FRONT ---
   return (
     <main className="relative bg-[#050505] min-h-screen text-[#fff1f1] p-4 md:p-8 font-sans selection:bg-[#6f01ff] overflow-x-hidden animate-fade">
@@ -170,9 +229,12 @@ export default function Home() {
             <img src="/pruple_png_main.png" alt="Logo" className="h-16 md:h-24 w-auto object-contain transition-all" />
           </div>
           <div className="flex justify-end">
-            <button onClick={() => setIsCartOpen(true)} className="flex items-center space-x-3 bg-[#6f01ff] px-6 py-2.5 rounded-full text-white font-black hover:bg-[#9e4ffe] transition-all shadow-[0_0_25px_rgba(111,1,255,0.3)]">
-              <ShoppingBag size={16} strokeWidth={3} />
-              <span className="text-[12px]">{cartItems.length}</span>
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-3 bg-white/5 rounded-full hover:bg-[#6f01ff] transition-all group"
+            >
+              <ShoppingBag size={20} className="text-white group-hover:scale-110 transition-transform"/>
+              {cartItems.length > 0 && <span className="absolute -top-1 -right-1 bg-[#6f01ff] w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold animate-pulse">{cartItems.length}</span>}
             </button>
           </div>
         </nav>
@@ -308,7 +370,15 @@ export default function Home() {
 
               <div className="pt-6 border-t border-white/10">
                 <div className="flex justify-between text-xl font-black mb-6 italic uppercase"><span>TOTAL</span><span className="text-[#6f01ff]">INR {totalPrice}.00</span></div>
-                <button disabled={cartItems.length === 0} className="w-full bg-[#fff1f1] text-black py-6 rounded-full font-black text-xl hover:bg-[#6f01ff] hover:text-white transition-all shadow-xl disabled:opacity-20 uppercase italic">Proceed to Payment</button>
+                
+                {/* CONNECTED RAZORPAY BUTTON */}
+                <button 
+                  onClick={handlePayment} 
+                  disabled={cartItems.length === 0 || isProcessing} 
+                  className="w-full bg-[#fff1f1] text-black py-6 rounded-full font-black text-xl hover:bg-[#6f01ff] hover:text-white transition-all shadow-xl disabled:opacity-20 uppercase italic"
+                >
+                  {isProcessing ? "Processing..." : "Proceed to Payment"}
+                </button>
               </div>
             </div>
           </div>
@@ -326,6 +396,10 @@ export default function Home() {
         @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade { animation: fade 0.4s ease-in-out; }
       `}</style>
+      
+      {/* Load Razorpay Script - CORRECTLY PLACED HERE */}
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
+      
     </main>
   );
 }
