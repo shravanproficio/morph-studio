@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ShoppingBag, Maximize, Zap, X, Truck, User, Mail, 
   MapPin, Phone, Calendar, Trash2, Star, ChevronRight, ChevronLeft,
-  LayoutDashboard, PackageCheck, PackageSearch, IndianRupee, TrendingUp, Filter, Lock, Plus, PlusCircle, Database, Image as ImageIcon, Upload, CheckCircle2, AlertCircle
+  LayoutDashboard, PackageCheck, PackageSearch, IndianRupee, TrendingUp, Filter, Lock, Plus, PlusCircle, Database, Image as ImageIcon, Upload, CheckCircle2, AlertCircle, ShoppingCart, BarChart3
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -61,18 +61,20 @@ export default function Home() {
   useEffect(() => {
     const savedProds = localStorage.getItem('morph_prods');
     const savedCats = localStorage.getItem('morph_cats');
+    const savedOrders = localStorage.getItem('morph_orders');
+
     if (savedProds) setProducts(JSON.parse(savedProds));
     else setProducts([
         { id: 1, name: 'VECNA BUST', price: 'INR 449.00', tag: 'TOP SELLING', category: 'Stranger Things', imgs: ['/Strangerthings1.jpeg'], dimensions: '14.2cm H', stock: 'AVAILABLE', description: 'Terrifyingly detailed bust of the Curse of Hawkins.', reviews: [{user: "Arjun_X", rating: 5, comment: "Insane detail on the tentacles!"}] }
     ]);
+    
     if (savedCats) setCategories(JSON.parse(savedCats));
+    if (savedOrders) setOrders(JSON.parse(savedOrders));
+    
     setIsLoaded(true);
 
-    // Shift + A Shortcut
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.shiftKey && e.key === 'A') {
-            setShowLogin(true);
-        }
+        if (e.shiftKey && e.key === 'A') setShowLogin(true);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -82,8 +84,9 @@ export default function Home() {
     if (isLoaded) {
         localStorage.setItem('morph_prods', JSON.stringify(products));
         localStorage.setItem('morph_cats', JSON.stringify(categories));
+        localStorage.setItem('morph_orders', JSON.stringify(orders));
     }
-  }, [products, categories, isLoaded]);
+  }, [products, categories, orders, isLoaded]);
 
   // --- 3. LOGIC ---
   const triggerToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
@@ -113,7 +116,6 @@ export default function Home() {
 
   const handleUploadProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    // Fixed pricing logic: ensures no accidental subtraction occurs during entry
     const createdProduct: Product = {
         id: Date.now(),
         name: newProd.name.toUpperCase(),
@@ -152,6 +154,25 @@ export default function Home() {
     } else triggerToast("Invalid Credentials");
   };
 
+  const handleCheckoutNow = () => {
+    if (!formData.name || cartItems.length === 0) return triggerToast("Details missing");
+    
+    const newOrder: Order = {
+        id: `MOR-${Math.floor(1000 + Math.random() * 9000)}`,
+        customer: formData.name,
+        items: cartItems.map(i => i.name),
+        amount: totalPrice,
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        status: 'Pending',
+        pincode: pincode
+    };
+
+    setOrders([newOrder, ...orders]);
+    setCartItems([]);
+    setIsCartOpen(false);
+    triggerToast("Haul sequence initiated!");
+  };
+
   const toggleStock = (id: number) => {
     setProducts(products.map(p => p.id === id ? { ...p, stock: p.stock === 'AVAILABLE' ? 'OUT OF STOCK' : 'AVAILABLE' } : p));
   };
@@ -174,20 +195,21 @@ export default function Home() {
 
   const nextImg = (e: React.MouseEvent) => { e.stopPropagation(); if (selectedProduct) setCurrentImgIdx((prev) => (prev + 1) % selectedProduct.imgs.length); };
   const prevImg = (e: React.MouseEvent) => { e.stopPropagation(); if (selectedProduct) setCurrentImgIdx((prev) => (prev - 1 + selectedProduct.imgs.length) % selectedProduct.imgs.length); };
-  const nextRev = () => { if (selectedProduct) setCurrentRevIdx((prev) => (prev + 1) % selectedProduct.reviews.length); };
-  const prevRev = () => { if (selectedProduct) setCurrentRevIdx((prev) => (prev - 1 + selectedProduct.reviews.length) % selectedProduct.reviews.length); };
+  const nextRev = () => { if (selectedProduct) setCurrentRevIdx((prev) => (prev + 1) % (selectedProduct.reviews.length || 1)); };
+  const prevRev = () => { if (selectedProduct) setCurrentRevIdx((prev) => (prev - 1 + (selectedProduct.reviews.length || 1)) % (selectedProduct.reviews.length || 1)); };
 
   const storeProducts = useMemo(() => products.filter(p => p.category === activeCategory), [products, activeCategory]);
   
-  // Robust total price calculation using regex to extract digits only
   const totalPrice = cartItems.reduce((acc, item) => {
     const val = item.price.replace(/[^0-9.]/g, '');
     return acc + parseFloat(val || '0');
   }, 0);
 
+  const totalRevenue = orders.reduce((acc, order) => acc + order.amount, 0);
+
   if (!isLoaded) return <div className="bg-black min-h-screen flex items-center justify-center text-[#6f01ff] font-black uppercase tracking-[2em]">Morphing...</div>;
 
-  // --- 4. ADMIN VIEW ---
+  // --- 4. ADMIN VIEW (With Dashboard) ---
   if (view === 'admin') {
     return (
       <div className="bg-[#050505] min-h-screen text-white p-6 md:p-12 font-sans animate-fade">
@@ -197,40 +219,55 @@ export default function Home() {
             <button onClick={() => setView('landing')} className="bg-white/10 px-8 py-3 rounded-full text-xs font-black uppercase hover:bg-white hover:text-black transition-all shadow-xl">Exit</button>
           </header>
 
+          {/* DASHBOARD STATS */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+            <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5">
+                <IndianRupee className="text-[#6f01ff] mb-2" size={20} />
+                <p className="text-[10px] uppercase opacity-40 font-bold tracking-widest">Revenue</p>
+                <h3 className="text-3xl font-black">₹{totalRevenue.toFixed(2)}</h3>
+            </div>
+            <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5">
+                <ShoppingCart className="text-blue-400 mb-2" size={20} />
+                <p className="text-[10px] uppercase opacity-40 font-bold tracking-widest">Orders</p>
+                <h3 className="text-3xl font-black">{orders.length}</h3>
+            </div>
+            <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5">
+                <PackageSearch className="text-yellow-500 mb-2" size={20} />
+                <p className="text-[10px] uppercase opacity-40 font-bold tracking-widest">Pending</p>
+                <h3 className="text-3xl font-black">{orders.filter(o => o.status === 'Pending').length}</h3>
+            </div>
+            <div className="bg-zinc-900 p-8 rounded-[2.5rem] border border-white/5">
+                <BarChart3 className="text-green-500 mb-2" size={20} />
+                <p className="text-[10px] uppercase opacity-40 font-bold tracking-widest">Products</p>
+                <h3 className="text-3xl font-black">{products.length}</h3>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            {/* UPLOAD PANEL */}
             <div className="lg:col-span-4 space-y-8">
                 <div className="bg-zinc-900 border border-white/5 p-8 rounded-[3rem] shadow-xl">
                     <h2 className="text-sm font-black uppercase italic mb-6 text-[#6f01ff]">New Artifact</h2>
                     <form onSubmit={handleUploadProduct} className="space-y-4">
-                        <input type="text" placeholder="NAME" required className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.name} onChange={(e)=>setNewProd({...newProd, name: e.target.value})}/>
+                        <input type="text" placeholder="PRODUCT NAME" required className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.name} onChange={(e)=>setNewProd({...newProd, name: e.target.value})}/>
                         <textarea placeholder="DESCRIPTION" required rows={2} className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.desc} onChange={(e)=>setNewProd({...newProd, desc: e.target.value})}/>
-                        <select className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.category} onChange={(e)=>setNewProd({...newProd, category: e.target.value})}>
+                        <select className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold" value={newProd.category} onChange={(e)=>setNewProd({...newProd, category: e.target.value})}>
                             {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                         </select>
                         <div className="grid grid-cols-2 gap-4">
                             <input type="text" placeholder="SIZE" className="bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold" value={newProd.size} onChange={(e)=>setNewProd({...newProd, size: e.target.value})}/>
-                            <input type="number" placeholder="PRICE" required className="bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold" value={newProd.price} onChange={(e)=>setNewProd({...newProd, price: e.target.value})}/>
+                            <input type="number" placeholder="PRICE" className="bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold" value={newProd.price} onChange={(e)=>setNewProd({...newProd, price: e.target.value})}/>
                         </div>
                         <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-white/5 border-dashed rounded-2xl cursor-pointer hover:bg-white/5 transition-all">
+                            <ImageIcon size={20} className="opacity-20 mb-1"/>
                             <p className="text-[9px] font-bold opacity-30 uppercase">Images ({localImgs.length}/4)</p>
                             <input type="file" multiple className="hidden" onChange={(e)=>handleFileChange(e, 'product')}/>
                         </label>
-                        <button type="submit" className="w-full bg-[#6f01ff] text-white py-4 rounded-2xl font-black uppercase italic text-xs shadow-lg">Deploy Product</button>
+                        <button type="submit" className="w-full bg-[#6f01ff] text-white py-4 rounded-2xl font-black uppercase italic text-xs tracking-widest shadow-lg">Deploy</button>
                     </form>
                 </div>
 
-                <div className="bg-zinc-900 border border-white/5 p-8 rounded-[3rem]">
-                    <h2 className="text-sm font-black uppercase italic mb-6 text-blue-400">New Series Banner</h2>
-                    <div className="space-y-4">
-                        <input type="text" placeholder="SERIES NAME" className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newCatName} onChange={(e)=>setNewCatName(e.target.value)}/>
-                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-white/5 border-dashed rounded-2xl cursor-pointer overflow-hidden">
-                            {newCatBanner ? <img src={newCatBanner} className="h-full w-full object-cover opacity-50"/> : <Upload size={20} className="opacity-20"/>}
-                            <input type="file" className="hidden" onChange={(e)=>handleFileChange(e, 'category')}/>
-                        </label>
-                        <button onClick={handleAddCategory} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase italic text-xs shadow-lg">Create Series</button>
-                    </div>
-                </div>
-
+                {/* SERIES CONTROL */}
                 <div className="bg-zinc-900 border border-white/5 p-8 rounded-[3rem] shadow-xl">
                     <h2 className="text-sm font-black uppercase italic mb-6 text-red-500">Active Collections</h2>
                     <div className="space-y-3">
@@ -244,7 +281,50 @@ export default function Home() {
                 </div>
             </div>
 
+            {/* ORDER PIPELINE TABLE */}
             <div className="lg:col-span-8 space-y-8">
+                <div className="bg-zinc-900 border border-white/5 rounded-[3rem] overflow-hidden shadow-2xl">
+                    <div className="p-8 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+                        <h2 className="text-sm font-black uppercase italic tracking-widest">Order Pipeline</h2>
+                        <div className="flex gap-2">
+                           <button onClick={() => {setOrders([]); localStorage.removeItem('morph_orders');}} className="text-[9px] font-bold opacity-20 hover:opacity-100 uppercase">Clear All</button>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-white/5 uppercase text-[9px] font-black opacity-40">
+                                <tr className="border-b border-white/5">
+                                    <th className="p-6">ID</th>
+                                    <th className="p-6">Customer</th>
+                                    <th className="p-6">Amount</th>
+                                    <th className="p-6">Items</th>
+                                    <th className="p-6 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {orders.map(o => (
+                                    <tr key={o.id} className="hover:bg-white/[0.01]">
+                                        <td className="p-6 font-mono text-[#6f01ff] font-bold">{o.id}</td>
+                                        <td className="p-6">
+                                            <p className="font-black uppercase italic">{o.customer}</p>
+                                            <p className="text-[9px] opacity-40">{o.date}</p>
+                                        </td>
+                                        <td className="p-6 font-black">₹{o.amount.toFixed(2)}</td>
+                                        <td className="p-6"><span className="text-[10px] opacity-60">{o.items.length} items</span></td>
+                                        <td className="p-6 text-right">
+                                            <button onClick={()=>setOrders(orders.filter(ord=>ord.id!==o.id))} className="text-red-500/50 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {orders.length === 0 && (
+                                    <tr><td colSpan={5} className="p-20 text-center opacity-20 font-black uppercase italic tracking-widest">Pipeline Empty</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* INVENTORY TABLE */}
                 <div className="bg-zinc-900 border border-white/5 rounded-[3rem] overflow-hidden shadow-2xl">
                     <div className="p-8 border-b border-white/5 bg-white/[0.02] flex justify-between items-center"><h2 className="text-sm font-black uppercase italic tracking-widest">Inventory Management</h2></div>
                     <div className="overflow-x-auto">
@@ -284,7 +364,12 @@ export default function Home() {
               <div key={cat.name} onClick={() => { setActiveCategory(cat.name); setView('store'); }} className={`relative cursor-pointer group overflow-hidden rounded-[2.5rem] bg-zinc-900 border border-white/5 transition-all duration-700 ${idx === 0 ? 'h-[55vh] md:h-[65vh] md:col-span-2' : 'h-[45vh] md:h-[50vh]'}`}>
                 <img src={cat.banner} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-all duration-[2s] opacity-90" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent z-20" />
-                <div className="absolute bottom-12 left-12 z-30"><h2 className={`font-black italic uppercase tracking-tighter leading-none drop-shadow-2xl text-white ${idx === 0 ? 'text-5xl md:text-8xl' : 'text-3xl md:text-4xl'}`}>{cat.name}</h2><p className="text-[#6f01ff] font-black tracking-[0.5em] uppercase mt-6 text-[10px] flex items-center gap-3"><span className="w-2 h-2 bg-[#6f01ff] rounded-full animate-ping" /> ENTER VOID</p></div>
+                <div className="absolute bottom-12 left-12 z-30">
+                  <h2 className={`font-black italic uppercase tracking-tighter leading-none drop-shadow-2xl text-white ${idx === 0 ? 'text-5xl md:text-8xl' : 'text-3xl md:text-4xl'}`}>{cat.name}</h2>
+                  <p className={`${idx === 0 ? 'text-[#6f01ff]' : 'text-white/40'} font-black tracking-[0.5em] uppercase mt-6 text-[10px] flex items-center gap-3`}>
+                    {hasStock ? <><span className="w-2 h-2 bg-[#6f01ff] rounded-full animate-ping" /> ENTER VOID</> : "DROPPING SOON"}
+                  </p>
+                </div>
               </div>
             )
           })}
@@ -350,10 +435,15 @@ export default function Home() {
             <div className="space-y-8">
               <h2 className="text-5xl md:text-6xl font-black italic uppercase text-white leading-tight">{selectedProduct.name}</h2>
               <p className="text-4xl font-black text-[#6f01ff] underline underline-offset-[12px] decoration-white/10">{selectedProduct.price}</p>
-              <div className="bg-[#6f01ff]/5 p-8 rounded-[3rem] border border-[#6f01ff]/20 text-[#e5c7f4] text-md leading-relaxed shadow-inner">{selectedProduct.description}</div>
+              
+              {/* DESCRIPTION BOX - STRICT HEIGHT RETAINED */}
+              <div className="bg-[#6f01ff]/5 p-8 rounded-[3rem] border border-[#6f01ff]/20 text-[#e5c7f4] text-md leading-relaxed shadow-inner min-h-[120px]">
+                {selectedProduct.description}
+              </div>
+
               <div className="flex items-center space-x-4 bg-white/5 p-6 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest"><Maximize size={20} className="text-[#6f01ff]" />Dimension: {selectedProduct.dimensions}</div>
               
-              {/* Verified Swipeable Reviews */}
+              {/* REVIEWS CAROUSEL - STRICT LOGIC RETAINED */}
               <div className="border-t border-white/10 pt-10">
                 <p className="text-[11px] font-black text-[#6f01ff] uppercase tracking-[0.4em] mb-6">Verified Reports</p>
                 {selectedProduct.reviews.length > 0 ? (
@@ -395,8 +485,7 @@ export default function Home() {
             ))}</div>
             <div className="space-y-5">
               <input type="text" placeholder="NAME" className="w-full bg-black border border-white/10 rounded-3xl py-5 px-6 text-sm font-bold outline-none focus:border-[#6f01ff] transition-all" onChange={(e)=>setFormData({...formData, name: e.target.value})}/>
-              <div className="grid grid-cols-2 gap-5"><input type="text" placeholder="PHONE" className="bg-black border border-white/10 rounded-3xl py-5 px-6 text-sm font-bold outline-none focus:border-[#6f01ff]" onChange={(e)=>setFormData({...formData, number: e.target.value})}/><input type="text" placeholder="AGE" className="bg-black border border-white/10 rounded-3xl py-5 px-6 text-sm font-bold outline-none focus:border-[#6f01ff]" onChange={(e)=>setFormData({...formData, age: e.target.value})}/></div>
-              <input type="email" placeholder="EMAIL" className="w-full bg-black border border-white/10 rounded-3xl py-5 px-6 text-sm font-bold outline-none focus:border-[#6f01ff]" onChange={(e)=>setFormData({...formData, mail: e.target.value})}/>
+              <input type="text" placeholder="PHONE" className="w-full bg-black border border-white/10 rounded-3xl py-5 px-6 text-sm font-bold outline-none focus:border-[#6f01ff]" onChange={(e)=>setFormData({...formData, number: e.target.value})}/>
               <textarea placeholder="ADDRESS" rows={3} className="w-full bg-black border border-white/10 rounded-3xl py-5 px-6 text-sm font-bold outline-none focus:border-[#6f01ff] transition-all font-bold" onChange={(e)=>setFormData({...formData, address: e.target.value})}></textarea>
               <div className="bg-[#6f01ff]/5 border border-[#6f01ff]/20 p-8 rounded-[3rem] shadow-inner text-center">
                 <label className="text-[10px] font-black uppercase text-[#6f01ff] mb-4 block tracking-[0.3em]">Pincode Verification</label>
@@ -404,14 +493,21 @@ export default function Home() {
                 {deliveryEst && <div className="mt-6 flex items-center justify-center space-x-4 text-green-400 font-black text-xs uppercase italic animate-bounce"><Truck size={22} /><span>{deliveryEst}</span></div>}
               </div>
               <div className="pt-10 border-t border-white/10 text-center">
-                <div className="flex justify-between text-2xl font-black mb-10 italic uppercase tracking-tighter"><span>GRAND TOTAL</span><span className="text-[#6f01ff] font-black italic underline underline-offset-8 decoration-white/10">INR {totalPrice}.00</span></div>
-                <button disabled={cartItems.length === 0} className="w-full bg-white text-black py-8 rounded-full font-black text-2xl hover:bg-[#6f01ff] hover:text-white transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] disabled:opacity-20 uppercase italic flex items-center justify-center gap-4">Checkout Now</button>
+                <div className="flex justify-between text-2xl font-black mb-10 italic uppercase tracking-tighter"><span>GRAND TOTAL</span><span className="text-[#6f01ff] font-black italic underline underline-offset-8 decoration-white/10">INR {totalPrice.toFixed(2)}</span></div>
+                <button onClick={handleCheckoutNow} disabled={cartItems.length === 0} className="w-full bg-white text-black py-8 rounded-full font-black text-2xl hover:bg-[#6f01ff] hover:text-white transition-all shadow-xl disabled:opacity-20 uppercase italic flex items-center justify-center gap-4">Checkout Now</button>
               </div>
             </div>
           </div>
         </div>
       )}
       {toast && <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[1000] bg-white text-black px-12 py-5 rounded-full font-black uppercase italic text-xs shadow-2xl">{toast}</div>}
+      
+      <style jsx global>{`
+        @keyframes drawer { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .animate-drawer { animation: drawer 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade { animation: fade 0.6s ease-in-out; }
+      `}</style>
     </main>
   );
 }
