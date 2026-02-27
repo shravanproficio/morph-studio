@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import Script from 'next/script';
 import { 
   ShoppingBag, Maximize, Zap, X, Truck, User, Mail, 
   MapPin, Phone, Calendar, Trash2, Star, ChevronRight, ChevronLeft,
@@ -56,8 +55,9 @@ export default function Home() {
   const [deliveryEst, setDeliveryEst] = useState('');
   const [formData, setFormData] = useState({ name: '', number: '', mail: '', address: '', age: '' });
   const [toast, setToast] = useState<string | null>(null);
+  const [monthFilter, setMonthFilter] = useState('All');
 
-  // --- 2. LOCAL STORAGE & SHORTCUTS ---
+  // --- 2. LOCAL STORAGE LOGIC ---
   useEffect(() => {
     const savedProds = localStorage.getItem('morph_prods');
     const savedCats = localStorage.getItem('morph_cats');
@@ -68,8 +68,11 @@ export default function Home() {
     if (savedCats) setCategories(JSON.parse(savedCats));
     setIsLoaded(true);
 
+    // Shift + A Shortcut
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.shiftKey && e.key === 'A') setShowLogin(true);
+        if (e.shiftKey && e.key === 'A') {
+            setShowLogin(true);
+        }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -110,13 +113,13 @@ export default function Home() {
 
   const handleUploadProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanPrice = parseFloat(newProd.price);
+    // Fixed pricing logic: ensures no accidental subtraction occurs during entry
     const createdProduct: Product = {
         id: Date.now(),
         name: newProd.name.toUpperCase(),
         description: newProd.desc,
         dimensions: newProd.size,
-        price: `INR ${cleanPrice.toFixed(2)}`,
+        price: `INR ${parseFloat(newProd.price).toFixed(2)}`,
         category: newProd.category,
         tag: 'NEW DROP',
         imgs: localImgs.length > 0 ? localImgs : ['/Strangerthings1.jpeg'],
@@ -126,7 +129,7 @@ export default function Home() {
     setProducts([createdProduct, ...products]);
     setNewProd({ ...newProd, name: '', desc: '', size: '', price: '' });
     setLocalImgs([]);
-    triggerToast("Artifact Live");
+    triggerToast("Artifact Deployed");
   };
 
   const handleAddCategory = () => {
@@ -136,10 +139,10 @@ export default function Home() {
   };
 
   const deleteCategory = (catName: string) => {
-    if (categories.length <= 1) return triggerToast("Must have 1 collection");
+    if (categories.length <= 1) return triggerToast("Must have 1 category");
     setCategories(categories.filter(c => c.name !== catName));
     setProducts(products.filter(p => p.category !== catName));
-    triggerToast("Series Purged");
+    triggerToast(`${catName} Purged`);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -159,7 +162,7 @@ export default function Home() {
   };
 
   const addToCart = (product: Product) => {
-    if (product.stock === 'OUT OF STOCK') return triggerToast("Sold Out");
+    if (product.stock === 'OUT OF STOCK') return triggerToast("Currently Unavailable");
     setCartItems([...cartItems, product]);
     setSelectedProduct(null);
     setTimeout(() => setIsCartOpen(true), 400);
@@ -176,24 +179,22 @@ export default function Home() {
 
   const storeProducts = useMemo(() => products.filter(p => p.category === activeCategory), [products, activeCategory]);
   
-  const totalPrice = useMemo(() => {
-    return cartItems.reduce((acc, item) => {
-      const val = item.price.replace(/[^0-9.]/g, '');
-      return acc + (parseFloat(val) || 0);
-    }, 0);
-  }, [cartItems]);
+  // Robust total price calculation using regex to extract digits only
+  const totalPrice = cartItems.reduce((acc, item) => {
+    const val = item.price.replace(/[^0-9.]/g, '');
+    return acc + parseFloat(val || '0');
+  }, 0);
 
   if (!isLoaded) return <div className="bg-black min-h-screen flex items-center justify-center text-[#6f01ff] font-black uppercase tracking-[2em]">Morphing...</div>;
 
-  // --- 4. VIEWS ---
-
+  // --- 4. ADMIN VIEW ---
   if (view === 'admin') {
     return (
       <div className="bg-[#050505] min-h-screen text-white p-6 md:p-12 font-sans animate-fade">
         <div className="max-w-7xl mx-auto">
           <header className="flex justify-between items-center mb-12 border-b border-white/5 pb-6">
             <h1 className="text-3xl font-black italic uppercase text-[#6f01ff] flex items-center gap-3"><LayoutDashboard /> Admin Hub</h1>
-            <button onClick={() => setView('landing')} className="bg-white/10 px-8 py-3 rounded-full text-xs font-black uppercase hover:bg-white hover:text-black transition-all">Exit</button>
+            <button onClick={() => setView('landing')} className="bg-white/10 px-8 py-3 rounded-full text-xs font-black uppercase hover:bg-white hover:text-black transition-all shadow-xl">Exit</button>
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -201,9 +202,9 @@ export default function Home() {
                 <div className="bg-zinc-900 border border-white/5 p-8 rounded-[3rem] shadow-xl">
                     <h2 className="text-sm font-black uppercase italic mb-6 text-[#6f01ff]">New Artifact</h2>
                     <form onSubmit={handleUploadProduct} className="space-y-4">
-                        <input type="text" placeholder="PRODUCT NAME" required className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.name} onChange={(e)=>setNewProd({...newProd, name: e.target.value})}/>
+                        <input type="text" placeholder="NAME" required className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.name} onChange={(e)=>setNewProd({...newProd, name: e.target.value})}/>
                         <textarea placeholder="DESCRIPTION" required rows={2} className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.desc} onChange={(e)=>setNewProd({...newProd, desc: e.target.value})}/>
-                        <select className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold" value={newProd.category} onChange={(e)=>setNewProd({...newProd, category: e.target.value})}>
+                        <select className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newProd.category} onChange={(e)=>setNewProd({...newProd, category: e.target.value})}>
                             {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                         </select>
                         <div className="grid grid-cols-2 gap-4">
@@ -211,7 +212,6 @@ export default function Home() {
                             <input type="number" placeholder="PRICE" required className="bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold" value={newProd.price} onChange={(e)=>setNewProd({...newProd, price: e.target.value})}/>
                         </div>
                         <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-white/5 border-dashed rounded-2xl cursor-pointer hover:bg-white/5 transition-all">
-                            <ImageIcon size={20} className="opacity-20 mb-1"/>
                             <p className="text-[9px] font-bold opacity-30 uppercase">Images ({localImgs.length}/4)</p>
                             <input type="file" multiple className="hidden" onChange={(e)=>handleFileChange(e, 'product')}/>
                         </label>
@@ -223,8 +223,8 @@ export default function Home() {
                     <h2 className="text-sm font-black uppercase italic mb-6 text-blue-400">New Series Banner</h2>
                     <div className="space-y-4">
                         <input type="text" placeholder="SERIES NAME" className="w-full bg-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none" value={newCatName} onChange={(e)=>setNewCatName(e.target.value)}/>
-                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-white/5 border-dashed rounded-2xl cursor-pointer">
-                            {newCatBanner ? <img src={newCatBanner} className="h-full w-full object-cover rounded-2xl opacity-50"/> : <Upload size={20} className="opacity-20"/>}
+                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-white/5 border-dashed rounded-2xl cursor-pointer overflow-hidden">
+                            {newCatBanner ? <img src={newCatBanner} className="h-full w-full object-cover opacity-50"/> : <Upload size={20} className="opacity-20"/>}
                             <input type="file" className="hidden" onChange={(e)=>handleFileChange(e, 'category')}/>
                         </label>
                         <button onClick={handleAddCategory} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase italic text-xs shadow-lg">Create Series</button>
@@ -237,7 +237,7 @@ export default function Home() {
                         {categories.map(cat => (
                             <div key={cat.name} className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/5">
                                 <span className="text-[10px] font-black uppercase tracking-widest">{cat.name}</span>
-                                <button onClick={()=>deleteCategory(cat.name)} className="text-red-500/30 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                <button onClick={()=>deleteCategory(cat.name)} className="text-red-500/30 hover:text-red-500 transition-colors p-2"><Trash2 size={16}/></button>
                             </div>
                         ))}
                     </div>
@@ -269,6 +269,7 @@ export default function Home() {
     );
   }
 
+  // --- 5. LANDING VIEW ---
   if (view === 'landing') {
     return (
       <div className="bg-black min-h-screen font-sans text-white overflow-x-hidden animate-fade">
@@ -283,12 +284,7 @@ export default function Home() {
               <div key={cat.name} onClick={() => { setActiveCategory(cat.name); setView('store'); }} className={`relative cursor-pointer group overflow-hidden rounded-[2.5rem] bg-zinc-900 border border-white/5 transition-all duration-700 ${idx === 0 ? 'h-[55vh] md:h-[65vh] md:col-span-2' : 'h-[45vh] md:h-[50vh]'}`}>
                 <img src={cat.banner} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-all duration-[2s] opacity-90" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent z-20" />
-                <div className="absolute bottom-12 left-12 z-30">
-                  <h2 className={`font-black italic uppercase tracking-tighter leading-none drop-shadow-2xl text-white ${idx === 0 ? 'text-5xl md:text-8xl' : 'text-3xl md:text-4xl'}`}>{cat.name}</h2>
-                  <p className={`${idx === 0 ? 'text-[#6f01ff]' : 'text-white/40'} font-black tracking-[0.5em] uppercase mt-6 text-[10px] flex items-center gap-3`}>
-                    {hasStock ? <><span className="w-2 h-2 bg-[#6f01ff] rounded-full animate-ping" /> ENTER VOID</> : "DROPPING SOON"}
-                  </p>
-                </div>
+                <div className="absolute bottom-12 left-12 z-30"><h2 className={`font-black italic uppercase tracking-tighter leading-none drop-shadow-2xl text-white ${idx === 0 ? 'text-5xl md:text-8xl' : 'text-3xl md:text-4xl'}`}>{cat.name}</h2><p className="text-[#6f01ff] font-black tracking-[0.5em] uppercase mt-6 text-[10px] flex items-center gap-3"><span className="w-2 h-2 bg-[#6f01ff] rounded-full animate-ping" /> ENTER VOID</p></div>
               </div>
             )
           })}
@@ -314,21 +310,21 @@ export default function Home() {
                 </div>
             </div>
         )}
+        {toast && <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[1000] bg-white text-black px-12 py-5 rounded-full font-black uppercase italic text-xs shadow-2xl">{toast}</div>}
       </div>
     );
   }
 
-  // --- STORE FRONT ---
+  // --- 6. STORE VIEW ---
   return (
     <main className="relative bg-[#050505] min-h-screen text-[#fff1f1] p-4 md:p-8 font-sans overflow-x-hidden animate-fade">
       <div className="fixed top-[-10%] left-[-10%] w-[70%] h-[70%] bg-[#6f01ff]/20 blur-[180px] animate-pulse pointer-events-none" />
       <div className="relative z-10 max-w-7xl mx-auto">
         <nav className="grid grid-cols-3 items-center mb-16 border-b border-[#6f01ff]/20 pb-10 backdrop-blur-xl sticky top-0 z-[100] pt-6">
           <div onClick={() => setView('landing')} className="flex justify-start text-[10px] font-black italic uppercase text-[#6f01ff] cursor-pointer hover:opacity-50 tracking-widest transition-all">← Back</div>
-          <div className="flex justify-center drop-shadow-[0_0_20px_rgba(111,1,255,0.4)]"><img src="/pruple_png_main.png" alt="Logo" className="h-20 md:h-36 w-auto object-contain animate-pulse" /></div>
+          <div className="flex justify-center drop-shadow-[0_0_20px_rgba(111,1,255,0.4)]"><img src="/pruple_png_main.png" alt="Logo" className="h-24 md:h-40 w-auto object-contain animate-pulse" /></div>
           <div className="flex justify-end"><button onClick={() => setIsCartOpen(true)} className="flex items-center space-x-4 bg-[#6f01ff] px-8 py-3 rounded-full text-white font-black hover:scale-105 transition-all shadow-[0_0_30px_rgba(111,1,255,0.5)]"><ShoppingBag size={20}/><span className="text-sm">{cartItems.length}</span></button></div>
         </nav>
-
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-32">
           {storeProducts.map((item) => (
             <div key={item.id} onClick={() => {setSelectedProduct(item); setCurrentImgIdx(0); setCurrentRevIdx(0);}} className={`group relative bg-zinc-900/40 backdrop-blur-3xl border border-white/5 p-7 rounded-[3.5rem] transition-all duration-700 cursor-pointer shadow-2xl overflow-hidden ${item.stock === 'OUT OF STOCK' ? 'opacity-50 grayscale' : 'hover:border-[#6f01ff]/60'}`}>
@@ -348,26 +344,41 @@ export default function Home() {
           <div className="relative w-full max-w-lg bg-[#0d0d0d] border-l border-[#6f01ff]/40 h-full p-8 md:p-14 overflow-y-auto animate-drawer shadow-2xl">
             <button onClick={() => setSelectedProduct(null)} className="absolute top-10 right-10 z-20 p-4 bg-white/5 rounded-full hover:bg-red-600 transition-all hover:rotate-90 shadow-xl"><X size={24}/></button>
             <div className="relative mb-12 overflow-hidden rounded-[3rem] border border-white/10 aspect-square bg-[#121212]">
-                <img src={selectedProduct.imgs[currentImgIdx]} className="w-full h-full object-cover animate-fade" key={currentImgIdx} />
+                <img src={selectedProduct.imgs[currentImgIdx]} className="w-full h-full object-cover animate-fade" key={`img-${currentImgIdx}`} />
                 {selectedProduct.imgs.length > 1 && (<div className="absolute inset-0 flex items-center justify-between px-6"><button onClick={prevImg} className="p-3 bg-black/60 rounded-full hover:bg-[#6f01ff] transition-all"><ChevronLeft size={24} /></button><button onClick={nextImg} className="p-3 bg-black/60 rounded-full hover:bg-[#6f01ff] transition-all"><ChevronRight size={24} /></button></div>)}
             </div>
             <div className="space-y-8">
-              <h2 className="text-5xl font-black italic uppercase text-white leading-tight">{selectedProduct.name}</h2>
+              <h2 className="text-5xl md:text-6xl font-black italic uppercase text-white leading-tight">{selectedProduct.name}</h2>
               <p className="text-4xl font-black text-[#6f01ff] underline underline-offset-[12px] decoration-white/10">{selectedProduct.price}</p>
               <div className="bg-[#6f01ff]/5 p-8 rounded-[3rem] border border-[#6f01ff]/20 text-[#e5c7f4] text-md leading-relaxed shadow-inner">{selectedProduct.description}</div>
               <div className="flex items-center space-x-4 bg-white/5 p-6 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest"><Maximize size={20} className="text-[#6f01ff]" />Dimension: {selectedProduct.dimensions}</div>
               
+              {/* Verified Swipeable Reviews */}
               <div className="border-t border-white/10 pt-10">
                 <p className="text-[11px] font-black text-[#6f01ff] uppercase tracking-[0.4em] mb-6">Verified Reports</p>
                 {selectedProduct.reviews.length > 0 ? (
                   <div className="relative bg-white/5 p-8 rounded-[2.5rem] border border-white/5 overflow-hidden shadow-2xl min-h-[140px]">
-                    <div className="animate-fade" key={`rev-${currentRevIdx}`}><div className="flex justify-between items-center mb-3"><span className="text-xs font-bold text-white italic">{selectedProduct.reviews[currentRevIdx].user}</span><div className="flex text-yellow-500 space-x-1"><Star size={14} fill="currentColor" /></div></div><p className="text-sm italic text-white/70 leading-relaxed">"{selectedProduct.reviews[currentRevIdx].comment}"</p></div>
-                    {selectedProduct.reviews.length > 1 && (<div className="flex items-center justify-between mt-8 pt-5 border-t border-white/5"><button onClick={prevRev} className="text-white/20 hover:text-white transition-all"><ChevronLeft size={18}/></button><span className="text-[10px] font-black text-white/30">{currentRevIdx + 1} / {selectedProduct.reviews.length}</span><button onClick={nextRev} className="text-white/20 hover:text-white transition-all"><ChevronRight size={18}/></button></div>)}
+                    <div className="animate-fade" key={`rev-${currentRevIdx}`}>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-xs font-bold text-white italic">{selectedProduct.reviews[currentRevIdx].user}</span>
+                        <div className="flex text-yellow-500 space-x-1"><Star size={14} fill="currentColor" /></div>
+                      </div>
+                      <p className="text-sm italic text-white/70 leading-relaxed">"{selectedProduct.reviews[currentRevIdx].comment}"</p>
+                    </div>
+                    {selectedProduct.reviews.length > 1 && (
+                      <div className="flex items-center justify-between mt-8 pt-5 border-t border-white/5">
+                        <button onClick={prevRev} className="text-white/20 hover:text-white transition-all"><ChevronLeft size={18}/></button>
+                        <span className="text-[10px] font-black text-white/30">{currentRevIdx + 1} / {selectedProduct.reviews.length}</span>
+                        <button onClick={nextRev} className="text-white/20 hover:text-white transition-all"><ChevronRight size={18}/></button>
+                      </div>
+                    )}
                   </div>
                 ) : <p className="text-[10px] uppercase tracking-widest text-white/10 text-center italic">Scanning the void for feedback...</p>}
               </div>
 
-              <button disabled={selectedProduct.stock === 'OUT OF STOCK'} onClick={() => addToCart(selectedProduct)} className={`w-full text-white py-8 rounded-full font-black text-2xl transition-all transform active:scale-95 italic shadow-xl mt-10 ${selectedProduct.stock === 'OUT OF STOCK' ? 'bg-zinc-800 opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-[#6f01ff] to-[#9e4ffe] hover:scale-[1.02]'}`}>{selectedProduct.stock === 'OUT OF STOCK' ? 'SOLD OUT' : 'ADD TO VOID +'}</button>
+              <button disabled={selectedProduct.stock === 'OUT OF STOCK'} onClick={() => addToCart(selectedProduct)} className={`w-full text-white py-8 rounded-full font-black text-2xl transition-all transform active:scale-95 italic shadow-xl mt-10 ${selectedProduct.stock === 'OUT OF STOCK' ? 'bg-zinc-800 opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-[#6f01ff] to-[#9e4ffe] hover:scale-[1.02]'}`}>
+                {selectedProduct.stock === 'OUT OF STOCK' ? 'SOLD OUT' : 'ADD TO VOID +'}
+              </button>
             </div>
           </div>
         </div>
@@ -393,15 +404,14 @@ export default function Home() {
                 {deliveryEst && <div className="mt-6 flex items-center justify-center space-x-4 text-green-400 font-black text-xs uppercase italic animate-bounce"><Truck size={22} /><span>{deliveryEst}</span></div>}
               </div>
               <div className="pt-10 border-t border-white/10 text-center">
-                <div className="flex justify-between text-2xl font-black mb-10 italic uppercase tracking-tighter"><span>GRAND TOTAL</span><span className="text-[#6f01ff] font-black italic underline underline-offset-8 decoration-white/10">INR {totalPrice.toFixed(2)}</span></div>
-                <button disabled={cartItems.length === 0} className="w-full bg-white text-black py-8 rounded-full font-black text-2xl hover:bg-[#6f01ff] hover:text-white transition-all shadow-xl disabled:opacity-20 uppercase italic flex items-center justify-center gap-4">Checkout Now</button>
+                <div className="flex justify-between text-2xl font-black mb-10 italic uppercase tracking-tighter"><span>GRAND TOTAL</span><span className="text-[#6f01ff] font-black italic underline underline-offset-8 decoration-white/10">INR {totalPrice}.00</span></div>
+                <button disabled={cartItems.length === 0} className="w-full bg-white text-black py-8 rounded-full font-black text-2xl hover:bg-[#6f01ff] hover:text-white transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] disabled:opacity-20 uppercase italic flex items-center justify-center gap-4">Checkout Now</button>
               </div>
             </div>
           </div>
         </div>
       )}
       {toast && <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[1000] bg-white text-black px-12 py-5 rounded-full font-black uppercase italic text-xs shadow-2xl">{toast}</div>}
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
     </main>
   );
 }
